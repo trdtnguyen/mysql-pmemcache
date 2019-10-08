@@ -1,0 +1,12 @@
+#!/bin/bash 
+MYSQL_HOME=/home/vldb/mysql-pmemcache
+
+#debug mode
+IS_DEBUG=0
+#IS_DEBUG=1
+
+BUILD_NAME="-DUNIV_PMEMOBJ_PC_DEBUG"
+echo "BUILD MODE: $BUILD_NAME with debug=$IS_DEBUG"
+cd $MYSQL_HOME/bld
+cmake .. -DWITH_DEBUG=$IS_DEBUG  -DCMAKE_C_FLAGS="$BUILD_NAME -DUNIV_AIO_IMPROVE" -DCMAKE_CXX_FLAGS="$BUILD_NAME -DUNIV_AIO_IMPROVE" -DDOWNLOAD_BOOST=1 -DWITH_BOOST=/root/boost
+make install -j48
