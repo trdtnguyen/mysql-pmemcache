@@ -3388,6 +3388,9 @@ dberr_t btr_cur_update_in_place(
   roll_ptr_t roll_ptr = 0;
   ulint was_delete_marked;
   ibool is_hashed;
+#if defined (UNIV_PMEM_CACHE)
+  bool is_nvm_page = false;
+#endif
 
   rec = btr_cur_get_rec(cursor);
   index = cursor->index;
@@ -3472,7 +3475,6 @@ dberr_t btr_cur_update_in_place(
     rw_lock_x_unlock(btr_get_search_latch(index));
   }
 #if defined (UNIV_PMEM_CACHE)
-  bool is_nvm_page = false;
   if (is_nvm_page) {
 	  /*skip generating REDO logs for NVM-resident pages*/
   } else {
