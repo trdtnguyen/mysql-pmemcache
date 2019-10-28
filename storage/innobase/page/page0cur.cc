@@ -1381,8 +1381,18 @@ rec_t *page_cur_insert_rec_low(
 
   /* 9. Write log record of the insert */
   if (UNIV_LIKELY(mtr != NULL)) {
+#if defined (UNIV_PMEM_CACHE)
+	bool is_nvm_page = false;
+	if (is_nvm_page) {
+		/*skip generating REDO log for nvm-page*/
+	} else {
+		page_cur_insert_rec_write_log(insert_rec, rec_size, current_rec, index,
+                                  mtr);
+	}
+#else //original
     page_cur_insert_rec_write_log(insert_rec, rec_size, current_rec, index,
                                   mtr);
+#endif /*UNIV_PMEM_CACHE*/
   }
 
   return (insert_rec);
@@ -1730,8 +1740,18 @@ rec_t *page_cur_insert_rec_zip(
 
       if (!log_compressed) {
         if (page_zip_compress(page_zip, page, index, level, NULL)) {
+#if defined (UNIV_PMEM_CACHE)
+		  bool is_nvm_page = false;
+		  if (is_nvm_page) {
+			/*skip generating REDO log for nvm-page*/
+		  } else {
+			page_cur_insert_rec_write_log(insert_rec, rec_size, cursor->rec,
+                                        index, mtr);
+		  }
+#else //original
           page_cur_insert_rec_write_log(insert_rec, rec_size, cursor->rec,
                                         index, mtr);
+#endif /* UNIV_PMEM_CACHE*/
           page_zip_compress_write_log_no_data(level, page, index, mtr);
 
           rec_offs_make_valid(insert_rec, index, offsets);
@@ -1964,8 +1984,18 @@ rec_t *page_cur_insert_rec_zip(
 
   /* 9. Write log record of the insert */
   if (UNIV_LIKELY(mtr != NULL)) {
+#if defined (UNIV_PMEM_CACHE)
+	bool is_nvm_page = false;
+	if (is_nvm_page) {
+		/*skip generating REDO logs for nvm-page*/
+	} else {
+		page_cur_insert_rec_write_log(insert_rec, rec_size, cursor->rec, index,
+                                  mtr);
+	}
+#else //original
     page_cur_insert_rec_write_log(insert_rec, rec_size, cursor->rec, index,
                                   mtr);
+#endif /*UNIV_PMEM_CACHE*/
   }
 
   return (insert_rec);
@@ -2159,7 +2189,16 @@ void page_copy_rec_list_end_to_created_page(
     heap_top += rec_size;
 
     rec_offs_make_valid(insert_rec, index, offsets);
+#if defined (UNIV_PMEM_CACHE)
+	bool is_nvm_page = false;
+	if (is_nvm_page) {
+		/*skip generating REDO logs for nvm-page*/
+	} else {
+		page_cur_insert_rec_write_log(insert_rec, rec_size, prev_rec, index, mtr);
+	}
+#else //original
     page_cur_insert_rec_write_log(insert_rec, rec_size, prev_rec, index, mtr);
+#endif /*UNIV_PMEM_CACHE*/
     prev_rec = insert_rec;
     rec = page_rec_get_next(rec);
   } while (!page_rec_is_supremum(rec));

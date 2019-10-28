@@ -199,7 +199,15 @@ static ulint trx_undo_page_set_next_prev_and_add(
   mach_write_to_2(ptr_to_first_free, end_of_rec);
 
   /* Write this log entry to the UNDO log */
+#if defined (UNIV_PMEM_CACHE)
+  if (false){
+	/*skip generate UNDO logs and REDO logs of UNDO page*/
+  } else {
+	trx_undof_page_add_undo_rec_log(undo_page, first_free, end_of_rec, mtr);
+  }
+#else //original
   trx_undof_page_add_undo_rec_log(undo_page, first_free, end_of_rec, mtr);
+#endif /*UNIV_PMEM_CACHE */
 
   return (first_free);
 }
@@ -1594,8 +1602,16 @@ static ulint trx_undo_page_report_modify(
                   ptr - undo_page);
 
   /* Write to the REDO log about this change in the UNDO log */
-
+#if defined (UNIV_PMEM_CACHE)
+  /*Skip write REDO log for UNDO page of hot pages*/
+  if (false) {
+	  /*skip*/
+  } else {
+	trx_undof_page_add_undo_rec_log(undo_page, first_free, ptr - undo_page, mtr);
+  }
+#else //original
   trx_undof_page_add_undo_rec_log(undo_page, first_free, ptr - undo_page, mtr);
+#endif /* UNIV_PMEM_CACHE*/
   DBUG_RETURN(first_free);
 }
 

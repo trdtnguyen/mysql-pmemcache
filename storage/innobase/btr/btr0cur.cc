@@ -3471,8 +3471,16 @@ dberr_t btr_cur_update_in_place(
   if (is_hashed) {
     rw_lock_x_unlock(btr_get_search_latch(index));
   }
-
+#if defined (UNIV_PMEM_CACHE)
+  bool is_nvm_page = false;
+  if (is_nvm_page) {
+	  /*skip generating REDO logs for NVM-resident pages*/
+  } else {
+	btr_cur_update_in_place_log(flags, rec, index, update, trx_id, roll_ptr, mtr);
+  }
+#else //original
   btr_cur_update_in_place_log(flags, rec, index, update, trx_id, roll_ptr, mtr);
+#endif /* UNIV_PMEM_CACHE*/
 
   if (was_delete_marked &&
       !rec_get_deleted_flag(rec, page_is_comp(buf_block_get_frame(block)))) {
@@ -4380,8 +4388,16 @@ dberr_t btr_cur_del_mark_set_clust_rec(
   }
 
   row_upd_rec_sys_fields(rec, page_zip, index, offsets, trx, roll_ptr);
-
+#if defined (UNIV_PMEM_CACHE)
+  bool is_nvm_page = false;
+  if (is_nvm_page) {
+	  /*skip generating REDO logs for nvm-page*/
+  } else {
+	btr_cur_del_mark_set_clust_rec_log(rec, index, trx->id, roll_ptr, mtr);
+  }
+#else //original
   btr_cur_del_mark_set_clust_rec_log(rec, index, trx->id, roll_ptr, mtr);
+#endif /*UNIV_PMEM_CACHE*/
 
   return (err);
 }
