@@ -164,6 +164,33 @@ byte *trx_undo_rec_get_partial_row(
  the transaction and in consistent reads that must look to the history of this
  transaction.
  @return DB_SUCCESS or error code */
+#if defined (UNIV_PMEM_CACHE)
+/*We add additional param*/
+dberr_t trx_undo_report_row_operation(
+	bool is_nvm_page,
+    ulint flags,                 /*!< in: if BTR_NO_UNDO_LOG_FLAG bit is
+                                 set, does nothing */
+    ulint op_type,               /*!< in: TRX_UNDO_INSERT_OP or
+                                 TRX_UNDO_MODIFY_OP */
+    que_thr_t *thr,              /*!< in: query thread */
+    dict_index_t *index,         /*!< in: clustered index */
+    const dtuple_t *clust_entry, /*!< in: in the case of an insert,
+                                 index entry to insert into the
+                                 clustered index, otherwise NULL */
+    const upd_t *update,         /*!< in: in the case of an update,
+                                 the update vector, otherwise NULL */
+    ulint cmpl_info,             /*!< in: compiler info on secondary
+                                 index updates */
+    const rec_t *rec,            /*!< in: case of an update or delete
+                                 marking, the record in the clustered
+                                 index, otherwise NULL */
+    const ulint *offsets,        /*!< in: rec_get_offsets(rec) */
+    roll_ptr_t *roll_ptr)        /*!< out: rollback pointer to the
+                                 inserted undo log record,
+                                 0 if BTR_NO_UNDO_LOG
+                                 flag was specified */
+    MY_ATTRIBUTE((warn_unused_result));
+#else //original
 dberr_t trx_undo_report_row_operation(
     ulint flags,                 /*!< in: if BTR_NO_UNDO_LOG_FLAG bit is
                                  set, does nothing */
@@ -187,6 +214,7 @@ dberr_t trx_undo_report_row_operation(
                                  0 if BTR_NO_UNDO_LOG
                                  flag was specified */
     MY_ATTRIBUTE((warn_unused_result));
+#endif /*UNIV_PMEM_CACHE*/
 
 /** status bit used for trx_undo_prev_version_build() */
 

@@ -2620,9 +2620,19 @@ UNIV_INLINE MY_ATTRIBUTE((warn_unused_result)) dberr_t
       dict_index_is_ibuf(index)) {
     return (err);
   }
+#if defined (UNIV_PMEM_CACHE)
+  buf_block_t* nvm_block = btr_cur_get_block(cursor);
+  buf_page_t* nvm_bpage = &(nvm_block->page);
 
+  /*TODO: set is_nvm_page to the flag in nvm_page*/
+  bool is_nvm_page = false;
+
+  err = trx_undo_report_row_operation(is_nvm_page, flags, TRX_UNDO_INSERT_OP, thr, index,
+                                      entry, NULL, 0, NULL, NULL, &roll_ptr);
+#else //original
   err = trx_undo_report_row_operation(flags, TRX_UNDO_INSERT_OP, thr, index,
                                       entry, NULL, 0, NULL, NULL, &roll_ptr);
+#endif /*UNIV_PMEM_CACHE*/
   if (err != DB_SUCCESS) {
     return (err);
   }
@@ -3143,10 +3153,21 @@ UNIV_INLINE MY_ATTRIBUTE((warn_unused_result)) dberr_t
   }
 
   /* Append the info about the update in the undo log */
+#if defined (UNIV_PMEM_CACHE)
+  buf_block_t* nvm_block = btr_cur_get_block(cursor);
+  buf_page_t* nvm_bpage = &(nvm_block->page);
 
+  /*TODO: set is_nvm_page to the flag in nvm_page*/
+  bool is_nvm_page = false;
+
+  return (trx_undo_report_row_operation(is_nvm_page, flags, TRX_UNDO_MODIFY_OP, thr, index,
+                                        NULL, update, cmpl_info, rec, offsets,
+                                        roll_ptr));
+#else //orignal
   return (trx_undo_report_row_operation(flags, TRX_UNDO_MODIFY_OP, thr, index,
                                         NULL, update, cmpl_info, rec, offsets,
                                         roll_ptr));
+#endif /*UNIV_PMEM_CACHE*/
 }
 
 /** Writes a redo log record of updating a record in-place. */
@@ -3390,6 +3411,8 @@ dberr_t btr_cur_update_in_place(
   ibool is_hashed;
 #if defined (UNIV_PMEM_CACHE)
   bool is_nvm_page = false;
+  buf_block_t* nvm_block;
+  buf_page_t* nvm_bpage;
 #endif
 
   rec = btr_cur_get_rec(cursor);
@@ -3475,6 +3498,9 @@ dberr_t btr_cur_update_in_place(
     rw_lock_x_unlock(btr_get_search_latch(index));
   }
 #if defined (UNIV_PMEM_CACHE)
+  nvm_block = btr_cur_get_block(cursor);
+  nvm_bpage = &(nvm_block->page);
+  /*get the flag from page's header*/
   if (is_nvm_page) {
 	  /*skip generating REDO logs for NVM-resident pages*/
   } else {
@@ -4335,6 +4361,11 @@ dberr_t btr_cur_del_mark_set_clust_rec(
   page_zip_des_t *page_zip;
   trx_t *trx;
 
+#if defined (UNIV_PMEM_CACHE)
+  buf_page_t* nvm_bpage;
+  bool is_nvm_page;
+#endif
+
   ut_ad(index->is_clustered());
   ut_ad(rec_offs_validate(rec, index, offsets));
   ut_ad(!!page_rec_is_comp(rec) == dict_table_is_comp(index->table));
@@ -4353,9 +4384,17 @@ dberr_t btr_cur_del_mark_set_clust_rec(
   if (err != DB_SUCCESS) {
     return (err);
   }
-
+#if defined (UNIV_PMEM_CACHE)
+  nvm_bpage = &(block->page);
+  
+  /*set is_nvm_page to your flag in nvm_bpage*/
+  is_nvm_page = false;
+  err = trx_undo_report_row_operation(is_nvm_page, flags, TRX_UNDO_MODIFY_OP, thr, index,
+                                      entry, NULL, 0, rec, offsets, &roll_ptr);
+#else //original
   err = trx_undo_report_row_operation(flags, TRX_UNDO_MODIFY_OP, thr, index,
                                       entry, NULL, 0, rec, offsets, &roll_ptr);
+#endif /*UNIV_PMEM_CACHE*/
   if (err != DB_SUCCESS) {
     return (err);
   }
@@ -4391,7 +4430,6 @@ dberr_t btr_cur_del_mark_set_clust_rec(
 
   row_upd_rec_sys_fields(rec, page_zip, index, offsets, trx, roll_ptr);
 #if defined (UNIV_PMEM_CACHE)
-  bool is_nvm_page = false;
   if (is_nvm_page) {
 	  /*skip generating REDO logs for nvm-page*/
   } else {

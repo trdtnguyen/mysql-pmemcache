@@ -162,11 +162,20 @@ calculation error below */
  that was written to ptr. Update the first free value by the number of bytes
  written for this undo record.
  @return offset of the inserted entry on the page if succeeded, 0 if fail */
+#if defined (UNIV_PMEM_CACHE)
+static ulint trx_undo_page_set_next_prev_and_add(
+	bool is_nvm_page,
+    page_t *undo_page, /*!< in/out: undo log page */
+    byte *ptr,         /*!< in: ptr up to where data has been
+                       written on this undo page. */
+    mtr_t *mtr)        /*!< in: mtr */
+#else //original
 static ulint trx_undo_page_set_next_prev_and_add(
     page_t *undo_page, /*!< in/out: undo log page */
     byte *ptr,         /*!< in: ptr up to where data has been
                        written on this undo page. */
     mtr_t *mtr)        /*!< in: mtr */
+#endif /* UNIV_PMEM_CACHE*/
 {
   ulint first_free; /*!< offset within undo_page */
   ulint end_of_rec; /*!< offset within undo_page */
@@ -200,7 +209,10 @@ static ulint trx_undo_page_set_next_prev_and_add(
 
   /* Write this log entry to the UNDO log */
 #if defined (UNIV_PMEM_CACHE)
-  if (false){
+  /*we use the input param here. Check
+   * trx_undo_page_report_insert() and trx_undo_page_set_next_prev_and_add()
+   * */
+  if (is_nvm_page){
 	/*skip generate UNDO logs and REDO logs of UNDO page*/
   } else {
 	trx_undof_page_add_undo_rec_log(undo_page, first_free, end_of_rec, mtr);
@@ -432,6 +444,16 @@ static bool trx_undo_report_insert_virtual(page_t *undo_page,
 
 /** Reports in the undo log of an insert of a clustered index record.
  @return offset of the inserted entry on the page if succeed, 0 if fail */
+#if defined (UNIV_PMEM_CACHE)
+static ulint trx_undo_page_report_insert(
+	bool is_nvm_page,
+    page_t *undo_page,           /*!< in: undo log page */
+    trx_t *trx,                  /*!< in: transaction */
+    dict_index_t *index,         /*!< in: clustered index */
+    const dtuple_t *clust_entry, /*!< in: index entry which will be
+                                 inserted to the clustered index */
+    mtr_t *mtr)                  /*!< in: mtr */
+#else //original
 static ulint trx_undo_page_report_insert(
     page_t *undo_page,           /*!< in: undo log page */
     trx_t *trx,                  /*!< in: transaction */
@@ -439,6 +461,7 @@ static ulint trx_undo_page_report_insert(
     const dtuple_t *clust_entry, /*!< in: index entry which will be
                                  inserted to the clustered index */
     mtr_t *mtr)                  /*!< in: mtr */
+#endif /*UNIV_PMEM_CACHE*/
 {
   ulint first_free;
   byte *ptr;
@@ -497,8 +520,11 @@ static ulint trx_undo_page_report_insert(
       return (0);
     }
   }
-
+#if defined (UNIV_PMEM_CACHE)
+  return (trx_undo_page_set_next_prev_and_add(is_nvm_page, undo_page, ptr, mtr));
+#else //original
   return (trx_undo_page_set_next_prev_and_add(undo_page, ptr, mtr));
+#endif /*UNIV_PMEM_CACHE*/
 }
 
 /** Reads from an undo log record the general parameters.
@@ -2008,6 +2034,31 @@ byte *trx_undo_parse_erase_page_end(
  the transaction and in consistent reads that must look to the history of this
  transaction.
  @return DB_SUCCESS or error code */
+#if defined (UNIV_PMEM_CACHE)
+dberr_t trx_undo_report_row_operation(
+	bool is_nvm_page,
+    ulint flags,                 /*!< in: if BTR_NO_UNDO_LOG_FLAG bit is
+                                 set, does nothing */
+    ulint op_type,               /*!< in: TRX_UNDO_INSERT_OP or
+                                 TRX_UNDO_MODIFY_OP */
+    que_thr_t *thr,              /*!< in: query thread */
+    dict_index_t *index,         /*!< in: clustered index */
+    const dtuple_t *clust_entry, /*!< in: in the case of an insert,
+                                 index entry to insert into the
+                                 clustered index, otherwise NULL */
+    const upd_t *update,         /*!< in: in the case of an update,
+                                 the update vector, otherwise NULL */
+    ulint cmpl_info,             /*!< in: compiler info on secondary
+                                 index updates */
+    const rec_t *rec,            /*!< in: in case of an update or delete
+                                 marking, the record in the clustered
+                                 index, otherwise NULL */
+    const ulint *offsets,        /*!< in: rec_get_offsets(rec) */
+    roll_ptr_t *roll_ptr)        /*!< out: rollback pointer to the
+                                 inserted undo log record,
+                                 0 if BTR_NO_UNDO_LOG
+                                 flag was specified */
+#else //original
 dberr_t trx_undo_report_row_operation(
     ulint flags,                 /*!< in: if BTR_NO_UNDO_LOG_FLAG bit is
                                  set, does nothing */
@@ -2030,6 +2081,7 @@ dberr_t trx_undo_report_row_operation(
                                  inserted undo log record,
                                  0 if BTR_NO_UNDO_LOG
                                  flag was specified */
+#endif /*PMEM_PMEM_CACHE*/
 {
   trx_t *trx;
   trx_undo_t *undo;
@@ -2152,8 +2204,13 @@ dberr_t trx_undo_report_row_operation(
 
     switch (op_type) {
       case TRX_UNDO_INSERT_OP:
+#if defined (UNIV_PMEM_CACHE)
+        offset = trx_undo_page_report_insert(is_nvm_page, undo_page, trx, index, clust_entry,
+                                             &mtr);
+#else // original
         offset = trx_undo_page_report_insert(undo_page, trx, index, clust_entry,
                                              &mtr);
+#endif /*UNIV_PMEM_CACHE*/
         break;
       default:
         ut_ad(op_type == TRX_UNDO_MODIFY_OP);
